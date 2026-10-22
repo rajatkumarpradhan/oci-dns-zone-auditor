@@ -1,0 +1,63 @@
+# oci-dns-zone-auditor
+
+Offline DNS zone hygiene auditor. It reads one JSON file with a zone's records (an export you already have), applies 10 rules and prints findings by severity. It can also write a JSON report.
+
+This is a portfolio project. The zone format is a simplified schema I made up, not the OCI DNS API shape. The data in `examples/` is synthetic. The auditor makes **no DNS queries** and calls no cloud API: it reasons only over the records in the file. Nothing here has been run against a real zone, and a clean result is not a security certification.
+
+## Run
+
+```
+python -m pip install -e .
+dns-audit examples/risky.json
+dns-audit examples/risky.json --output report.json --fail-on high
+```
+
+Exit codes: 0 ok, 1 bad input, 2 a finding at or above `--fail-on`.
+
+## Zone format
+
+```json
+{
+  "zone": "example.com",
+  "config": {"min_ttl": 60},
+  "records": [
+    {"name": "@", "type": "NS", "ttl": 86400, "rdata": "ns1.dns-vendor.net."},
+    {"name": "www", "type": "A", "ttl": 300, "rdata": "203.0.113.10"},
+    {"name": "api", "type": "CNAME", "ttl": 300, "rdata": "www.example.com."}
+  ]
+}
+```
+
+- `name`: `@` for the apex, a relative name (`www`), or an absolute name with a trailing dot (`www.example.com.`). Names are canonicalised to lower-case fully-qualified form.
+- `type`: any valid record-type token; unknown types are accepted and only checked by the generic rules (duplicates, TTL).
+- `config.min_ttl` defaults to 60 seconds (my policy assumption, not a DNS constant).
+
+## Rules
+
+| Rule | Severity | What it flags |
+|---|---|---|
+| DZ001 | high | CNAME at the zone apex (invalid; an apex cannot be an alias) |
+| DZ002 | high | CNAME coexisting with other record types at one name |
+| DZ003 | high | A/AAAA record pointing at a private/internal address (RFC1918, loopback, link-local, CGNAT) |
+| DZ004 | medium | MX records but no SPF TXT record at the apex |
+| DZ005 | medium | mail records but no DMARC TXT record at `_dmarc.<zone>` |
+| DZ006 | medium | CNAME to a target outside the zone that matches a cloud-service suffix (takeover candidate - offline hint only) |
+| DZ007 | low | TTL below the policy minimum |
+| DZ008 | low | wildcard record (broad catch-all) |
+| DZ009 | low | duplicate record (same name, type and data) |
+| DZ010 | low | no NS records at the apex |
+
+## Limits
+
+- No DNS queries. DZ006 is a pattern match against a built-in suffix list; whether the target is actually unclaimed is **not** verified and needs a live lookup.
+- The private-address ranges are an explicit list (RFC1918, 127.0.0.0/8, 169.254.0.0/16, 100.64.0.0/10, ::1, fc00::/7, fe80::/10). Documentation prefixes like 192.0.2.0/24 are deliberately not flagged.
+- Record data (`rdata`) is treated as an opaque string except for A/AAAA addresses, CNAME targets and the SPF/DMARC prefixes. No per-type syntax validation.
+- Rules check the records as written. They cannot tell whether a zone is actually delegated, reachable or correctly served.
+
+## Tests
+
+```
+python -m unittest discover -s tests -v
+```
+
+Tests cover each rule and boundary (TTL exactly at the minimum vs one below, private ranges vs documentation prefixes, DMARC at the exact `_dmarc` name vs elsewhere, one DZ002 finding per name, duplicates counted per extra copy), name canonicalisation, validation errors and CLI exit codes. `examples/good.json` must produce zero findings and `examples/risky.json` must trigger all 10 rules.
