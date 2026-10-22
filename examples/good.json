@@ -1,0 +1,15 @@
+{
+ "zone": "example.com",
+ "config": {"min_ttl": 60},
+ "records": [
+  {"name": "@", "type": "NS", "ttl": 86400, "rdata": "ns1.dns-vendor.net."},
+  {"name": "@", "type": "NS", "ttl": 86400, "rdata": "ns2.dns-vendor.net."},
+  {"name": "@", "type": "A", "ttl": 300, "rdata": "203.0.113.10"},
+  {"name": "@", "type": "MX", "ttl": 300, "rdata": "10 mail.example.com."},
+  {"name": "@", "type": "TXT", "ttl": 300, "rdata": "v=spf1 include:spf.vendor.net -all"},
+  {"name": "_dmarc", "type": "TXT", "ttl": 300, "rdata": "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"},
+  {"name": "www", "type": "A", "ttl": 300, "rdata": "203.0.113.10"},
+  {"name": "mail", "type": "A", "ttl": 300, "rdata": "203.0.113.25"},
+  {"name": "api", "type": "CNAME", "ttl": 300, "rdata": "www.example.com."}
+ ]
+}
