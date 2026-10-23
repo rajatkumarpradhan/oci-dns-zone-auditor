@@ -1,0 +1,16 @@
+{
+ "data": {
+  "name": "example.com",
+  "compartment-id": "ocid1.compartment.oc1..examplecmp0001",
+  "items": [
+   {"domain": "example.com.", "rtype": "NS", "ttl": 86400, "rdata": "ns1.p68.dns.oraclecloud.net.", "is-protected": true},
+   {"domain": "example.com.", "rtype": "NS", "ttl": 86400, "rdata": "ns2.p68.dns.oraclecloud.net.", "is-protected": true},
+   {"domain": "example.com.", "rtype": "A", "ttl": 300, "rdata": "203.0.113.10"},
+   {"domain": "example.com.", "rtype": "MX", "ttl": 300, "rdata": "10 mail.example.com."},
+   {"domain": "example.com.", "rtype": "TXT", "ttl": 300, "rdata": "v=spf1 include:spf.vendor.net -all"},
+   {"domain": "_dmarc.example.com.", "rtype": "TXT", "ttl": 300, "rdata": "v=DMARC1; p=quarantine"},
+   {"domain": "www.example.com.", "rtype": "CNAME", "ttl": 300, "rdata": "example.com."},
+   {"domain": "mail.example.com.", "rtype": "A", "ttl": 300, "rdata": "203.0.113.25"}
+  ]
+ }
+}
