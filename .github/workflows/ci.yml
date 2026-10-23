@@ -21,3 +21,7 @@ jobs:
         run: dns-audit examples/good.json --fail-on low
       - name: CLI smoke (risky zone is flagged)
         run: dns-audit examples/risky.json --output report.json --fail-on high || test $? -eq 2
+      - name: CLI smoke (import round trip)
+        run: |
+          dns-audit import examples/export.json -o /tmp/zone.json
+          dns-audit /tmp/zone.json --fail-on low
