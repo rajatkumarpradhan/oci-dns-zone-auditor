@@ -34,6 +34,7 @@ class Zone:
     name: str        # canonical zone name
     min_ttl: int = 60
     records: list[Record] = field(default_factory=list)
+    expected_ns: list[str] = field(default_factory=list)  # canonical nameserver hostnames
 
 
 def _str(v, what):
@@ -59,6 +60,14 @@ def _name(v, zone, what):
     return v
 
 
+def _host(v, what):
+    """Canonicalise an absolute hostname (nameserver target): lower-case, no trailing dot."""
+    v = _str(v, what).strip().lower().rstrip(".")
+    if len(v) > 253 or not all(LABEL.match(p) for p in v.split(".")):
+        raise ModelError(f"{what} is not a valid DNS name: {v!r}")
+    return v
+
+
 def load(data: dict) -> Zone:
     try:
         zone = _str(data.get("zone"), "zone").strip().lower().rstrip(".")
@@ -70,6 +79,10 @@ def load(data: dict) -> Zone:
         min_ttl = cfg.get("min_ttl", 60)
         if isinstance(min_ttl, bool) or not isinstance(min_ttl, int) or not 1 <= min_ttl <= 86400:
             raise ModelError(f"config.min_ttl must be an integer in [1, 86400], got {min_ttl!r}")
+        expected_ns = cfg.get("expected_ns", [])
+        if not isinstance(expected_ns, list):
+            raise ModelError("config.expected_ns must be a list of nameserver hostnames")
+        expected_ns = [_host(v, f"config.expected_ns[{i}]") for i, v in enumerate(expected_ns)]
         records = []
         for i, r in enumerate(data.get("records", [])):
             w = f"records[{i}]"
@@ -85,7 +98,7 @@ def load(data: dict) -> Zone:
                                   _str(r.get("rdata"), f"{w}.rdata")))
     except (TypeError, AttributeError) as e:
         raise ModelError(f"invalid model: {e!r}") from e
-    return Zone(zone, min_ttl, records)
+    return Zone(zone, min_ttl, records, expected_ns)
 
 
 def load_file(path: str) -> Zone:

@@ -1,5 +1,6 @@
 {
  "zone": "risky-example.com",
+ "config": {"expected_ns": ["ns1.dns-vendor.net", "ns2.dns-vendor.net"]},
  "records": [
   {"name": "@", "type": "CNAME", "ttl": 300, "rdata": "cdn.cloudfront.net."},
   {"name": "@", "type": "MX", "ttl": 300, "rdata": "10 mail.risky-example.com."},

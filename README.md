@@ -1,6 +1,6 @@
 # oci-dns-zone-auditor
 
-Offline DNS zone hygiene auditor. It reads one JSON file with a zone's records (an export you already have), applies 10 rules and prints findings by severity. It can also write a JSON report. An `import` subcommand converts an OCI-style zone export into the zone schema.
+Offline DNS zone hygiene auditor. It reads one JSON file with a zone's records (an export you already have), applies 11 rules and prints findings by severity. It can also write a JSON report. An `import` subcommand converts an OCI-style zone export into the zone schema.
 
 This is a portfolio project. The zone format is a simplified schema I made up, not the OCI DNS API shape. The data in `examples/` is synthetic. The auditor makes **no DNS queries** and calls no cloud API: it reasons only over the records in the file. Nothing here has been run against a real zone, and a clean result is not a security certification.
 
@@ -45,6 +45,7 @@ Records that cannot be mapped stop the import, and every bad record is reported 
 - `name`: `@` for the apex, a relative name (`www`), or an absolute name with a trailing dot (`www.example.com.`). Names are canonicalised to lower-case fully-qualified form.
 - `type`: any valid record-type token; unknown types are accepted and only checked by the generic rules (duplicates, TTL).
 - `config.min_ttl` defaults to 60 seconds (my policy assumption, not a DNS constant).
+- `config.expected_ns` (optional list) names the nameservers the zone should be delegated to, for example `["ns1.dns-vendor.net", "ns2.dns-vendor.net"]`. When it is set, DZ011 compares the apex NS records against it. Matching is exact and case-insensitive (trailing dots are normalised away). Leave it out or empty to disable the check.
 
 ## Rules
 
@@ -60,6 +61,7 @@ Records that cannot be mapped stop the import, and every bad record is reported 
 | DZ008 | low | wildcard record (broad catch-all) |
 | DZ009 | low | duplicate record (same name, type and data) |
 | DZ010 | low | no NS records at the apex |
+| DZ011 | medium | apex NS set differs from `config.expected_ns` (unexpected NS present, or expected NS missing) |
 
 ## Limits
 
@@ -75,4 +77,4 @@ Records that cannot be mapped stop the import, and every bad record is reported 
 python -m unittest discover -s tests -v
 ```
 
-Tests cover each rule and boundary (TTL exactly at the minimum vs one below, private ranges vs documentation prefixes, DMARC at the exact `_dmarc` name vs elsewhere, one DZ002 finding per name, duplicates counted per extra copy), name canonicalisation, validation errors, CLI exit codes and the importer (OCI-style conversion, envelope variants, malformed rows with line numbers). `examples/good.json` must produce zero findings and `examples/risky.json` must trigger all 10 rules.
+Tests cover each rule and boundary (TTL exactly at the minimum vs one below, private ranges vs documentation prefixes, DMARC at the exact `_dmarc` name vs elsewhere, one DZ002 finding per name, duplicates counted per extra copy, DZ011 exact-set match / extra / missing / disabled and case-insensitive matching), name canonicalisation, validation errors, CLI exit codes and the importer (OCI-style conversion, envelope variants, malformed rows with line numbers). `examples/good.json` must produce zero findings and `examples/risky.json` must trigger all 11 rules.
