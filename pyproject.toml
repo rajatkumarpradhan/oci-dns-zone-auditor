@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oci-dns-zone-auditor"
-version = "0.2.0"
+version = "0.3.0"
 description = "Offline DNS zone hygiene auditor for OCI-style zone exports: CNAME conflicts, leaked private IPs, missing SPF/DMARC, dangling cloud CNAMEs, TTL and wildcard checks on synthetic data"
 requires-python = ">=3.10"
 readme = "README.md"
