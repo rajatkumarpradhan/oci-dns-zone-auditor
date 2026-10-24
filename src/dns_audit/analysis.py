@@ -63,6 +63,18 @@ def analyze(zone: Zone) -> list[Finding]:
         out.append(Finding("DZ010", "low", f"zone:{zone.name}",
                            "Zone has no NS records at the apex; delegations usually need at least two.", {}))
 
+    if zone.expected_ns:
+        expected = set(zone.expected_ns)
+        actual = {_target(r.rdata) for r in apex_ns}
+        for ns in sorted(actual - expected):
+            out.append(Finding("DZ011", "medium", f"zone:{zone.name}",
+                               f"Apex NS record {ns} is not in the expected nameserver set; "
+                               "the delegation may be stale or misconfigured.", {"ns": ns}))
+        for ns in sorted(expected - actual):
+            out.append(Finding("DZ011", "medium", f"zone:{zone.name}",
+                               f"Expected nameserver {ns} has no NS record at the apex; "
+                               "the delegation looks incomplete against the expected set.", {"ns": ns}))
+
     if apex_mx and not any("v=spf1" in r.rdata.lower() for r in apex_txt):
         out.append(Finding("DZ004", "medium", f"zone:{zone.name}",
                            "Zone has MX records but no SPF TXT record at the apex; spoofed mail is harder to reject.", {}))
