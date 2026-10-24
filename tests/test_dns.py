@@ -34,7 +34,7 @@ class ExampleTests(unittest.TestCase):
 
     def test_risky_triggers_every_rule(self):
         d = json.load(open(os.path.join(EX, "risky.json"), encoding="utf-8"))
-        self.assertEqual(rules(d), {f"DZ{n:03d}" for n in range(1, 11)})
+        self.assertEqual(rules(d), {f"DZ{n:03d}" for n in range(1, 12)})
 
     def test_sorted_by_severity(self):
         d = json.load(open(os.path.join(EX, "risky.json"), encoding="utf-8"))
@@ -127,6 +127,56 @@ class RuleTests(unittest.TestCase):
         self.assertNotIn("DZ010", rules(zone([])))
 
 
+def zone_ns(records, expected=None, name="example.com"):
+    cfg = {} if expected is None else {"expected_ns": expected}
+    return {"zone": name, "config": cfg, "records": records}
+
+
+class DelegationTests(unittest.TestCase):
+    def test_exact_set_match_is_clean(self):
+        d = zone_ns([rec("@", "NS", "ns1.dns-vendor.net."), rec("@", "NS", "ns2.dns-vendor.net.")],
+                    ["ns1.dns-vendor.net", "ns2.dns-vendor.net"])
+        self.assertNotIn("DZ011", rules(d))
+
+    def test_extra_ns_flagged(self):
+        d = zone_ns([rec("@", "NS", "ns1.dns-vendor.net."), rec("@", "NS", "ns2.dns-vendor.net."),
+                     rec("@", "NS", "ns-old.other-provider.com.")],
+                    ["ns1.dns-vendor.net", "ns2.dns-vendor.net"])
+        f = [x for x in run(d) if x.rule == "DZ011"]
+        self.assertEqual(len(f), 1)
+        self.assertEqual(f[0].severity, "medium")
+        self.assertIn("ns-old.other-provider.com", f[0].message)
+
+    def test_missing_expected_ns_flagged(self):
+        d = zone_ns([rec("@", "NS", "ns1.dns-vendor.net.")],
+                    ["ns1.dns-vendor.net", "ns2.dns-vendor.net"])
+        f = [x for x in run(d) if x.rule == "DZ011"]
+        self.assertEqual(len(f), 1)
+        self.assertIn("ns2.dns-vendor.net", f[0].message)
+
+    def test_both_directions_flagged(self):
+        d = zone_ns([rec("@", "NS", "ns1.dns-vendor.net."), rec("@", "NS", "typo.dns-vendor.net.")],
+                    ["ns1.dns-vendor.net", "ns2.dns-vendor.net"])
+        f = [x for x in run(d) if x.rule == "DZ011"]
+        self.assertEqual(len(f), 2)
+
+    def test_empty_expected_list_disables_rule(self):
+        for cfg in (None, []):
+            d = zone_ns([rec("@", "NS", "anything.example.net.")], cfg)
+            self.assertNotIn("DZ011", rules(d))
+
+    def test_matching_is_case_and_dot_insensitive(self):
+        d = zone_ns([rec("@", "NS", "NS1.DNS-Vendor.NET.")], ["ns1.dns-vendor.net"])
+        self.assertNotIn("DZ011", rules(d))
+        d = zone_ns([rec("@", "NS", "ns1.dns-vendor.net")], ["NS1.DNS-Vendor.NET."])
+        self.assertNotIn("DZ011", rules(d))
+
+    def test_non_apex_ns_records_ignored(self):
+        d = zone_ns([rec("@", "NS", "ns1.dns-vendor.net."), rec("sub", "NS", "elsewhere.example.net.")],
+                    ["ns1.dns-vendor.net"])
+        self.assertNotIn("DZ011", rules(d))
+
+
 class ValidationTests(unittest.TestCase):
     def bad(self, m):
         d = zone([rec("a", "A", "203.0.113.1")])
@@ -141,6 +191,10 @@ class ValidationTests(unittest.TestCase):
             lambda d: d.update(config="x"),
             lambda d: d.update(config={"min_ttl": 0}),
             lambda d: d.update(config={"min_ttl": True}),
+            lambda d: d.update(config={"expected_ns": "ns1.example.net"}),
+            lambda d: d.update(config={"expected_ns": [""]}),
+            lambda d: d.update(config={"expected_ns": ["bad..name"]}),
+            lambda d: d.update(config={"expected_ns": [5]}),
             lambda d: d.update(records="x"),
             lambda d: d["records"].append("x"),
             lambda d: d["records"].append({"name": "a", "type": "A", "ttl": 300}),          # no rdata
@@ -167,7 +221,8 @@ class CliTests(unittest.TestCase):
             rep = json.load(open(out, encoding="utf-8"))
             self.assertIn("No DNS queries are made", rep["disclaimer"])
             self.assertEqual(rep["zone"], "risky-example.com")
-            self.assertEqual(len(rep["findings"]), 11)
+            self.assertEqual(len(rep["findings"]), 13)
+            self.assertEqual(sum(1 for f in rep["findings"] if f["rule"] == "DZ011"), 2)
             bad = os.path.join(t, "b.json")
             open(bad, "w").write("{oops")
             self.assertEqual(main([bad]), 1)
